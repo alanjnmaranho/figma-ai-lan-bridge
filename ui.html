@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Inter, -apple-system, sans-serif;
+      font-size: 12px;
+      padding: 12px;
+      background: #1e1e1e;
+      color: #fff;
+    }
+    h2 { font-size: 14px; margin-bottom: 12px; color: #fff; }
+    .section { margin-bottom: 16px; }
+    button {
+      background: #0d99ff;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-right: 8px;
+      margin-bottom: 8px;
+      font-size: 11px;
+    }
+    button:hover { background: #0b85e0; }
+    button.secondary {
+      background: #333;
+      border: 1px solid #444;
+    }
+    button.secondary:hover { background: #444; }
+    textarea, input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #444;
+      border-radius: 6px;
+      background: #2d2d2d;
+      color: #fff;
+      font-family: monospace;
+      font-size: 11px;
+      margin-bottom: 8px;
+    }
+    textarea { height: 120px; resize: vertical; }
+    #output {
+      background: #2d2d2d;
+      border: 1px solid #444;
+      border-radius: 6px;
+      padding: 8px;
+      height: 150px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 10px;
+      white-space: pre-wrap;
+    }
+    .label { color: #888; margin-bottom: 4px; display: block; }
+  </style>
+</head>
+<body>
+  <h2>🤖 AI-Lan Bridge</h2>
+  
+  <div class="section">
+    <span class="label">Quick Actions</span>
+    <button id="getSelection">Get Selection</button>
+    <button id="getPage">Get Page Structure</button>
+    <button id="exportSelection">Export Selection</button>
+  </div>
+  
+  <div class="section">
+    <span class="label">Command (paste from AI-Lan)</span>
+    <textarea id="command" placeholder='{"type": "rename-node", "payload": {"nodeId": "123:456", "newName": "New Name"}}'></textarea>
+    <button id="runCommand">Run Command</button>
+    <button id="copyOutput" class="secondary">Copy Output</button>
+  </div>
+  
+  <div class="section">
+    <span class="label">Output (copy to AI-Lan)</span>
+    <div id="output">Ready. Select something and click "Get Selection".</div>
+  </div>
+
+  <script>
+    const output = document.getElementById('output');
+    const commandInput = document.getElementById('command');
+    
+    function log(data) {
+      output.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+    }
+    
+    // Button handlers
+    document.getElementById('getSelection').onclick = () => {
+      parent.postMessage({ pluginMessage: { type: 'get-selection' } }, '*');
+    };
+    
+    document.getElementById('getPage').onclick = () => {
+      parent.postMessage({ pluginMessage: { type: 'get-page' } }, '*');
+    };
+    
+    document.getElementById('exportSelection').onclick = () => {
+      // Will export first selected node
+      parent.postMessage({ pluginMessage: { type: 'get-selection' } }, '*');
+    };
+    
+    document.getElementById('runCommand').onclick = () => {
+      try {
+        const cmd = JSON.parse(commandInput.value);
+        parent.postMessage({ pluginMessage: cmd }, '*');
+        log('Command sent: ' + cmd.type);
+      } catch (e) {
+        log('Error: Invalid JSON - ' + e.message);
+      }
+    };
+    
+    document.getElementById('copyOutput').onclick = () => {
+      navigator.clipboard.writeText(output.textContent);
+      log('Copied to clipboard!');
+      setTimeout(() => log(lastOutput), 1000);
+    };
+    
+    let lastOutput = 'Ready.';
+    
+    // Handle messages from plugin
+    window.onmessage = (event) => {
+      const msg = event.data.pluginMessage;
+      if (msg) {
+        lastOutput = msg;
+        log(msg);
+      }
+    };
+  </script>
+</body>
+</html>

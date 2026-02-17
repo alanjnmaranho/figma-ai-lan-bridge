@@ -1,0 +1,13 @@
+{
+  "name": "AI-Lan Bridge",
+  "id": "ai-lan-bridge",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "editorType": ["figma"],
+  "networkAccess": {
+    "allowedDomains": ["*"]
+  },
+  "capabilities": [],
+  "enableProposedApi": false
+}
