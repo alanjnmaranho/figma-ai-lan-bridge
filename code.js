@@ -287,17 +287,20 @@ figma.ui.onmessage = async (msg) => {
   }
   
   if (msg.type === 'get-colors') {
-    const result = runAudit(msg.payload?.scope || 'page');
+    const scope = (msg.payload && msg.payload.scope) || 'page';
+    const result = runAudit(scope);
     figma.ui.postMessage({ type: 'colors-result', data: result.colors });
   }
   
   if (msg.type === 'get-text-styles') {
-    const result = runAudit(msg.payload?.scope || 'page');
+    const scope = (msg.payload && msg.payload.scope) || 'page';
+    const result = runAudit(scope);
     figma.ui.postMessage({ type: 'text-styles-result', data: result.textStyles });
   }
   
   if (msg.type === 'get-spacing') {
-    const result = runAudit(msg.payload?.scope || 'page');
+    const scope = (msg.payload && msg.payload.scope) || 'page';
+    const result = runAudit(scope);
     figma.ui.postMessage({ type: 'spacing-result', data: result.spacing });
   }
   
