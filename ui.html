@@ -35,6 +35,12 @@
       background: #7c3aed;
     }
     button.audit:hover { background: #6d28d9; }
+    button.compliance {
+      background: #059669;
+    }
+    button.compliance:hover { background: #047857; }
+    .issue-count { color: #f59e0b; }
+    .ok-count { color: #10b981; }
     textarea, input {
       width: 100%;
       padding: 8px;
@@ -85,6 +91,18 @@
 </head>
 <body>
   <h2>🤖 AI-Lan Bridge</h2>
+  
+  <div class="section">
+    <h3>✅ Compliance Check</h3>
+    <p style="color: #888; font-size: 10px; margin-bottom: 8px;">Find layers using raw values instead of tokens</p>
+    <button class="compliance" id="complianceSelection">Check Selection</button>
+    <button class="compliance" id="compliancePage">Check Page</button>
+    <button class="compliance" id="complianceDocument">Check All</button>
+    <div style="margin-top: 8px;">
+      <button class="secondary" id="getLocalStyles">View Defined Styles</button>
+    </div>
+    <div id="complianceStats" class="stats" style="margin-top: 8px; display: none;"></div>
+  </div>
   
   <div class="section">
     <h3>🔍 Design System Audit</h3>
@@ -145,6 +163,45 @@
         <div class="stat">Components: <span class="stat-value">${summary.totalComponents}</span></div>
       `;
     }
+    
+    const complianceStatsDiv = document.getElementById('complianceStats');
+    
+    function showComplianceStats(summary) {
+      if (!summary) {
+        complianceStatsDiv.style.display = 'none';
+        return;
+      }
+      complianceStatsDiv.style.display = 'flex';
+      const issueClass = summary.totalIssues > 0 ? 'issue-count' : 'ok-count';
+      complianceStatsDiv.innerHTML = `
+        <div class="stat">Issues: <span class="stat-value ${issueClass}">${summary.totalIssues}</span></div>
+        <div class="stat">Fills: <span class="stat-value">${summary.fillsWithoutStyle}</span></div>
+        <div class="stat">Strokes: <span class="stat-value">${summary.strokesWithoutStyle}</span></div>
+        <div class="stat">Text: <span class="stat-value">${summary.textWithoutStyle}</span></div>
+        <div class="stat">Effects: <span class="stat-value">${summary.effectsWithoutStyle}</span></div>
+      `;
+    }
+    
+    // Compliance buttons
+    document.getElementById('complianceSelection').onclick = () => {
+      log('Checking compliance on selection...');
+      parent.postMessage({ pluginMessage: { type: 'check-compliance-selection' } }, '*');
+    };
+    
+    document.getElementById('compliancePage').onclick = () => {
+      log('Checking compliance on current page...');
+      parent.postMessage({ pluginMessage: { type: 'check-compliance-page' } }, '*');
+    };
+    
+    document.getElementById('complianceDocument').onclick = () => {
+      log('Checking compliance on entire document...');
+      parent.postMessage({ pluginMessage: { type: 'check-compliance-document' } }, '*');
+    };
+    
+    document.getElementById('getLocalStyles').onclick = () => {
+      log('Getting defined local styles...');
+      parent.postMessage({ pluginMessage: { type: 'get-local-styles' } }, '*');
+    };
     
     // Audit buttons
     document.getElementById('auditSelection').onclick = () => {
@@ -209,13 +266,24 @@
       const msg = event.data.pluginMessage;
       if (!msg) return;
       
-      if (msg.type === 'audit-result') {
+      if (msg.type === 'compliance-result') {
+        showComplianceStats(msg.data.summary);
+        showStats(null);
+        log(msg.data);
+      } else if (msg.type === 'local-styles-result') {
+        showComplianceStats(null);
+        showStats(null);
+        log(msg.data);
+      } else if (msg.type === 'audit-result') {
+        showComplianceStats(null);
         showStats(msg.data.summary);
         log(msg.data);
       } else if (msg.type === 'colors-result' || msg.type === 'text-styles-result' || msg.type === 'spacing-result') {
+        showComplianceStats(null);
         showStats(null);
         log(msg.data);
       } else {
+        showComplianceStats(null);
         showStats(null);
         log(msg);
       }

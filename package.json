@@ -1,0 +1,24 @@
+{
+  "name": "plugin",
+  "version": "1.0.0",
+  "description": "A Figma plugin that allows AI-Lan to read and manipulate Figma files.",
+  "main": "code.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alanjnmaranho/figma-ai-lan-bridge.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/alanjnmaranho/figma-ai-lan-bridge/issues"
+  },
+  "homepage": "https://github.com/alanjnmaranho/figma-ai-lan-bridge#readme",
+  "devDependencies": {
+    "@figma/plugin-typings": "^1.123.0",
+    "typescript": "^5.9.3"
+  }
+}

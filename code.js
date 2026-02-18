@@ -264,10 +264,237 @@ function runAudit(scope) {
 }
 
 // ============================================
+// COMPLIANCE CHECKER
+// ============================================
+
+function getLocalStyles() {
+  // Get all local paint styles (colors)
+  const paintStyles = figma.getLocalPaintStyles();
+  const paintStyleColors = new Map();
+  
+  for (const style of paintStyles) {
+    if (style.paints.length > 0 && style.paints[0].type === 'SOLID') {
+      const paint = style.paints[0];
+      const hex = rgbToHex(paint.color.r, paint.color.g, paint.color.b);
+      paintStyleColors.set(hex, {
+        name: style.name,
+        id: style.id,
+        hex
+      });
+    }
+  }
+  
+  // Get all local text styles
+  const textStyles = figma.getLocalTextStyles();
+  const textStyleMap = new Map();
+  
+  for (const style of textStyles) {
+    textStyleMap.set(style.id, {
+      name: style.name,
+      id: style.id,
+      fontSize: style.fontSize,
+      fontFamily: style.fontName.family,
+      fontStyle: style.fontName.style
+    });
+  }
+  
+  // Get all local effect styles
+  const effectStyles = figma.getLocalEffectStyles();
+  const effectStyleMap = new Map();
+  
+  for (const style of effectStyles) {
+    effectStyleMap.set(style.id, {
+      name: style.name,
+      id: style.id,
+      effects: style.effects.length
+    });
+  }
+  
+  return {
+    paintStyles: paintStyleColors,
+    paintStylesList: paintStyles.map(s => ({ name: s.name, id: s.id })),
+    textStyles: textStyleMap,
+    textStylesList: textStyles.map(s => ({ name: s.name, id: s.id })),
+    effectStyles: effectStyleMap,
+    effectStylesList: effectStyles.map(s => ({ name: s.name, id: s.id }))
+  };
+}
+
+function checkNodeCompliance(node, localStyles, issues, depth) {
+  if (depth === undefined) depth = 0;
+  if (depth > 50) return;
+  
+  // Check fill colors - is it using a style or raw value?
+  if ('fills' in node && Array.isArray(node.fills) && node.fills.length > 0) {
+    const fillStyleId = 'fillStyleId' in node ? node.fillStyleId : null;
+    
+    if (!fillStyleId || fillStyleId === '') {
+      // Not using a style - check if it's a solid color
+      for (const fill of node.fills) {
+        if (fill.type === 'SOLID' && fill.visible !== false) {
+          const hex = rgbToHex(fill.color.r, fill.color.g, fill.color.b);
+          // Check if this color exists in our paint styles
+          const matchingStyle = localStyles.paintStyles.get(hex);
+          issues.fills.push({
+            nodeId: node.id,
+            nodeName: node.name,
+            nodeType: node.type,
+            color: hex,
+            hasMatchingStyle: !!matchingStyle,
+            matchingStyleName: matchingStyle ? matchingStyle.name : null
+          });
+        }
+      }
+    }
+  }
+  
+  // Check stroke colors
+  if ('strokes' in node && Array.isArray(node.strokes) && node.strokes.length > 0) {
+    const strokeStyleId = 'strokeStyleId' in node ? node.strokeStyleId : null;
+    
+    if (!strokeStyleId || strokeStyleId === '') {
+      for (const stroke of node.strokes) {
+        if (stroke.type === 'SOLID' && stroke.visible !== false) {
+          const hex = rgbToHex(stroke.color.r, stroke.color.g, stroke.color.b);
+          const matchingStyle = localStyles.paintStyles.get(hex);
+          issues.strokes.push({
+            nodeId: node.id,
+            nodeName: node.name,
+            nodeType: node.type,
+            color: hex,
+            hasMatchingStyle: !!matchingStyle,
+            matchingStyleName: matchingStyle ? matchingStyle.name : null
+          });
+        }
+      }
+    }
+  }
+  
+  // Check text styles
+  if (node.type === 'TEXT') {
+    const textStyleId = 'textStyleId' in node ? node.textStyleId : null;
+    
+    if (!textStyleId || textStyleId === '' || textStyleId === figma.mixed) {
+      issues.text.push({
+        nodeId: node.id,
+        nodeName: node.name,
+        characters: node.characters ? node.characters.substring(0, 30) : '',
+        fontSize: typeof node.fontSize === 'number' ? node.fontSize : 'mixed',
+        fontFamily: typeof node.fontName === 'object' ? node.fontName.family : 'mixed'
+      });
+    }
+  }
+  
+  // Check effect styles
+  if ('effects' in node && Array.isArray(node.effects) && node.effects.length > 0) {
+    const effectStyleId = 'effectStyleId' in node ? node.effectStyleId : null;
+    
+    if (!effectStyleId || effectStyleId === '') {
+      issues.effects.push({
+        nodeId: node.id,
+        nodeName: node.name,
+        nodeType: node.type,
+        effectTypes: node.effects.filter(e => e.visible !== false).map(e => e.type)
+      });
+    }
+  }
+  
+  // Recurse into children
+  if ('children' in node) {
+    for (const child of node.children) {
+      checkNodeCompliance(child, localStyles, issues, depth + 1);
+    }
+  }
+}
+
+function runComplianceCheck(scope) {
+  const localStyles = getLocalStyles();
+  
+  const issues = {
+    fills: [],
+    strokes: [],
+    text: [],
+    effects: []
+  };
+  
+  let nodesToCheck = [];
+  
+  if (scope === 'selection') {
+    nodesToCheck = figma.currentPage.selection;
+  } else if (scope === 'page') {
+    nodesToCheck = figma.currentPage.children;
+  } else {
+    for (const page of figma.root.children) {
+      for (const child of page.children) {
+        checkNodeCompliance(child, localStyles, issues);
+      }
+    }
+  }
+  
+  if (scope !== 'document') {
+    for (const node of nodesToCheck) {
+      checkNodeCompliance(node, localStyles, issues);
+    }
+  }
+  
+  // Summarize
+  const detachedFills = issues.fills.filter(i => !i.hasMatchingStyle);
+  const fixableFills = issues.fills.filter(i => i.hasMatchingStyle);
+  const detachedStrokes = issues.strokes.filter(i => !i.hasMatchingStyle);
+  const fixableStrokes = issues.strokes.filter(i => i.hasMatchingStyle);
+  
+  return {
+    summary: {
+      totalIssues: issues.fills.length + issues.strokes.length + issues.text.length + issues.effects.length,
+      fillsWithoutStyle: issues.fills.length,
+      strokesWithoutStyle: issues.strokes.length,
+      textWithoutStyle: issues.text.length,
+      effectsWithoutStyle: issues.effects.length,
+      detachedColors: detachedFills.length + detachedStrokes.length,
+      fixableColors: fixableFills.length + fixableStrokes.length
+    },
+    definedStyles: {
+      paintStyles: localStyles.paintStylesList,
+      textStyles: localStyles.textStylesList,
+      effectStyles: localStyles.effectStylesList
+    },
+    issues: {
+      fills: issues.fills.slice(0, 50),
+      strokes: issues.strokes.slice(0, 50),
+      text: issues.text.slice(0, 50),
+      effects: issues.effects.slice(0, 50)
+    },
+    recommendations: []
+  };
+}
+
+// ============================================
 // MESSAGE HANDLERS
 // ============================================
 
 figma.ui.onmessage = async (msg) => {
+  
+  // ---- COMPLIANCE COMMANDS ----
+  
+  if (msg.type === 'check-compliance-selection') {
+    const result = runComplianceCheck('selection');
+    figma.ui.postMessage({ type: 'compliance-result', scope: 'selection', data: result });
+  }
+  
+  if (msg.type === 'check-compliance-page') {
+    const result = runComplianceCheck('page');
+    figma.ui.postMessage({ type: 'compliance-result', scope: 'page', data: result });
+  }
+  
+  if (msg.type === 'check-compliance-document') {
+    const result = runComplianceCheck('document');
+    figma.ui.postMessage({ type: 'compliance-result', scope: 'document', data: result });
+  }
+  
+  if (msg.type === 'get-local-styles') {
+    const styles = getLocalStyles();
+    figma.ui.postMessage({ type: 'local-styles-result', data: styles });
+  }
   
   // ---- AUDIT COMMANDS ----
   
