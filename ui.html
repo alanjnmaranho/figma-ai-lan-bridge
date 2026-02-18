@@ -11,7 +11,9 @@
       color: #fff;
     }
     h2 { font-size: 14px; margin-bottom: 12px; color: #fff; }
-    .section { margin-bottom: 16px; }
+    h3 { font-size: 12px; margin-bottom: 8px; color: #aaa; font-weight: 500; }
+    .section { margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #333; }
+    .section:last-child { border-bottom: none; }
     button {
       background: #0d99ff;
       color: white;
@@ -19,8 +21,8 @@
       padding: 8px 12px;
       border-radius: 6px;
       cursor: pointer;
-      margin-right: 8px;
-      margin-bottom: 8px;
+      margin-right: 6px;
+      margin-bottom: 6px;
       font-size: 11px;
     }
     button:hover { background: #0b85e0; }
@@ -29,6 +31,10 @@
       border: 1px solid #444;
     }
     button.secondary:hover { background: #444; }
+    button.audit {
+      background: #7c3aed;
+    }
+    button.audit:hover { background: #6d28d9; }
     textarea, input {
       width: 100%;
       padding: 8px;
@@ -40,33 +46,69 @@
       font-size: 11px;
       margin-bottom: 8px;
     }
-    textarea { height: 120px; resize: vertical; }
+    textarea { height: 100px; resize: vertical; }
     #output {
       background: #2d2d2d;
       border: 1px solid #444;
       border-radius: 6px;
       padding: 8px;
-      height: 150px;
+      height: 200px;
       overflow-y: auto;
       font-family: monospace;
       font-size: 10px;
       white-space: pre-wrap;
+      word-break: break-all;
     }
-    .label { color: #888; margin-bottom: 4px; display: block; }
+    .label { color: #888; margin-bottom: 4px; display: block; font-size: 10px; }
+    .badge {
+      display: inline-block;
+      background: #333;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      margin-left: 4px;
+    }
+    .stats {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+    .stat {
+      background: #2d2d2d;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+    }
+    .stat-value { font-weight: bold; color: #0d99ff; }
   </style>
 </head>
 <body>
   <h2>🤖 AI-Lan Bridge</h2>
   
   <div class="section">
-    <span class="label">Quick Actions</span>
+    <h3>🔍 Design System Audit</h3>
+    <button class="audit" id="auditSelection">Audit Selection</button>
+    <button class="audit" id="auditPage">Audit Page</button>
+    <button class="audit" id="auditDocument">Audit All</button>
+    <div style="margin-top: 8px;">
+      <button class="secondary" id="getColors">Colors Only</button>
+      <button class="secondary" id="getTextStyles">Text Styles Only</button>
+      <button class="secondary" id="getSpacing">Spacing Only</button>
+    </div>
+    <div id="stats" class="stats" style="margin-top: 8px; display: none;"></div>
+  </div>
+  
+  <div class="section">
+    <h3>⚡ Quick Actions</h3>
     <button id="getSelection">Get Selection</button>
     <button id="getPage">Get Page Structure</button>
     <button id="exportSelection">Export Selection</button>
   </div>
   
   <div class="section">
-    <span class="label">Command (paste from AI-Lan)</span>
+    <h3>🛠️ Run Command</h3>
+    <span class="label">Paste JSON command from AI-Lan</span>
     <textarea id="command" placeholder='{"type": "rename-node", "payload": {"nodeId": "123:456", "newName": "New Name"}}'></textarea>
     <button id="runCommand">Run Command</button>
     <button id="copyOutput" class="secondary">Copy Output</button>
@@ -74,18 +116,65 @@
   
   <div class="section">
     <span class="label">Output (copy to AI-Lan)</span>
-    <div id="output">Ready. Select something and click "Get Selection".</div>
+    <div id="output">Ready. Use the audit buttons above to analyze your design system.</div>
   </div>
 
   <script>
     const output = document.getElementById('output');
     const commandInput = document.getElementById('command');
+    const statsDiv = document.getElementById('stats');
+    
+    let lastOutput = 'Ready.';
     
     function log(data) {
-      output.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+      lastOutput = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+      output.textContent = lastOutput;
     }
     
-    // Button handlers
+    function showStats(summary) {
+      if (!summary) {
+        statsDiv.style.display = 'none';
+        return;
+      }
+      statsDiv.style.display = 'flex';
+      statsDiv.innerHTML = `
+        <div class="stat">Colors: <span class="stat-value">${summary.totalColors}</span></div>
+        <div class="stat">Text Styles: <span class="stat-value">${summary.totalTextStyles}</span></div>
+        <div class="stat">Spacing: <span class="stat-value">${summary.totalSpacingValues}</span></div>
+        <div class="stat">Effects: <span class="stat-value">${summary.totalEffects}</span></div>
+        <div class="stat">Components: <span class="stat-value">${summary.totalComponents}</span></div>
+      `;
+    }
+    
+    // Audit buttons
+    document.getElementById('auditSelection').onclick = () => {
+      log('Running audit on selection...');
+      parent.postMessage({ pluginMessage: { type: 'audit-selection' } }, '*');
+    };
+    
+    document.getElementById('auditPage').onclick = () => {
+      log('Running audit on current page...');
+      parent.postMessage({ pluginMessage: { type: 'audit-page' } }, '*');
+    };
+    
+    document.getElementById('auditDocument').onclick = () => {
+      log('Running audit on entire document...');
+      parent.postMessage({ pluginMessage: { type: 'audit-document' } }, '*');
+    };
+    
+    document.getElementById('getColors').onclick = () => {
+      parent.postMessage({ pluginMessage: { type: 'get-colors', payload: { scope: 'page' } } }, '*');
+    };
+    
+    document.getElementById('getTextStyles').onclick = () => {
+      parent.postMessage({ pluginMessage: { type: 'get-text-styles', payload: { scope: 'page' } } }, '*');
+    };
+    
+    document.getElementById('getSpacing').onclick = () => {
+      parent.postMessage({ pluginMessage: { type: 'get-spacing', payload: { scope: 'page' } } }, '*');
+    };
+    
+    // Quick action buttons
     document.getElementById('getSelection').onclick = () => {
       parent.postMessage({ pluginMessage: { type: 'get-selection' } }, '*');
     };
@@ -95,7 +184,6 @@
     };
     
     document.getElementById('exportSelection').onclick = () => {
-      // Will export first selected node
       parent.postMessage({ pluginMessage: { type: 'get-selection' } }, '*');
     };
     
@@ -111,17 +199,24 @@
     
     document.getElementById('copyOutput').onclick = () => {
       navigator.clipboard.writeText(output.textContent);
-      log('Copied to clipboard!');
-      setTimeout(() => log(lastOutput), 1000);
+      const prev = output.textContent;
+      output.textContent = '✓ Copied to clipboard!';
+      setTimeout(() => { output.textContent = prev; }, 1000);
     };
-    
-    let lastOutput = 'Ready.';
     
     // Handle messages from plugin
     window.onmessage = (event) => {
       const msg = event.data.pluginMessage;
-      if (msg) {
-        lastOutput = msg;
+      if (!msg) return;
+      
+      if (msg.type === 'audit-result') {
+        showStats(msg.data.summary);
+        log(msg.data);
+      } else if (msg.type === 'colors-result' || msg.type === 'text-styles-result' || msg.type === 'spacing-result') {
+        showStats(null);
+        log(msg.data);
+      } else {
+        showStats(null);
         log(msg);
       }
     };

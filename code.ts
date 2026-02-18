@@ -8,15 +8,48 @@ figma.showUI(__html__, { width: 450, height: 600 });
 // AUDIT DATA COLLECTORS
 // ============================================
 
-function rgbToHex(r, g, b) {
-  const toHex = (n) => {
+interface ColorInfo {
+  hex: string;
+  rgba: { r: number; g: number; b: number; a: number };
+  count: number;
+  usedIn: string[];
+}
+
+interface TextStyleInfo {
+  font: string;
+  size: number;
+  weight: string | number;
+  lineHeight: string;
+  key: string;
+  count: number;
+  usedIn: string[];
+}
+
+interface SpacingInfo {
+  value: number;
+  type: 'gap' | 'padding' | 'itemSpacing';
+  count: number;
+  usedIn: string[];
+}
+
+interface AuditData {
+  colors: Map<string, ColorInfo>;
+  textStyles: Map<string, TextStyleInfo>;
+  spacing: Map<number, SpacingInfo>;
+  effects: Map<string, { type: string; count: number; usedIn: string[] }>;
+  components: { name: string; id: string; instances: number }[];
+  issues: string[];
+}
+
+function rgbToHex(r: number, g: number, b: number): string {
+  const toHex = (n: number) => {
     const hex = Math.round(n * 255).toString(16);
     return hex.length === 1 ? '0' + hex : hex;
   };
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase();
 }
 
-function extractColors(node, audit) {
+function extractColors(node: SceneNode, audit: AuditData) {
   // Extract fill colors
   if ('fills' in node && Array.isArray(node.fills)) {
     for (const fill of node.fills) {
@@ -60,9 +93,9 @@ function extractColors(node, audit) {
   }
 }
 
-function extractTextStyles(node, audit) {
+function extractTextStyles(node: SceneNode, audit: AuditData) {
   if (node.type === 'TEXT') {
-    const textNode = node;
+    const textNode = node as TextNode;
     const fontSize = textNode.fontSize;
     const fontName = textNode.fontName;
     
@@ -96,9 +129,9 @@ function extractTextStyles(node, audit) {
   }
 }
 
-function extractSpacing(node, audit) {
+function extractSpacing(node: SceneNode, audit: AuditData) {
   if ('layoutMode' in node && node.layoutMode !== 'NONE') {
-    const frameNode = node;
+    const frameNode = node as FrameNode;
     
     // Item spacing (gap)
     if (frameNode.itemSpacing > 0) {
@@ -125,6 +158,7 @@ function extractSpacing(node, audit) {
     ].filter(p => p > 0);
     
     for (const pad of paddings) {
+      const key = pad + 0.001; // Offset to differentiate from gaps
       const existing = audit.spacing.get(pad);
       if (existing) {
         existing.count++;
@@ -140,7 +174,7 @@ function extractSpacing(node, audit) {
   }
 }
 
-function extractEffects(node, audit) {
+function extractEffects(node: SceneNode, audit: AuditData) {
   if ('effects' in node && Array.isArray(node.effects)) {
     for (const effect of node.effects) {
       if (effect.visible !== false) {
@@ -161,8 +195,7 @@ function extractEffects(node, audit) {
   }
 }
 
-function crawlNode(node, audit, depth) {
-  if (depth === undefined) depth = 0;
+function crawlNode(node: SceneNode, audit: AuditData, depth: number = 0) {
   if (depth > 50) return; // Safety limit
   
   extractColors(node, audit);
@@ -177,8 +210,8 @@ function crawlNode(node, audit, depth) {
   }
 }
 
-function runAudit(scope) {
-  const audit = {
+function runAudit(scope: 'selection' | 'page' | 'document'): any {
+  const audit: AuditData = {
     colors: new Map(),
     textStyles: new Map(),
     spacing: new Map(),
@@ -187,7 +220,7 @@ function runAudit(scope) {
     issues: []
   };
   
-  let nodesToAudit = [];
+  let nodesToAudit: readonly SceneNode[] = [];
   
   if (scope === 'selection') {
     nodesToAudit = figma.currentPage.selection;
@@ -212,7 +245,7 @@ function runAudit(scope) {
   const components = figma.currentPage.findAll(n => n.type === 'COMPONENT');
   for (const comp of components.slice(0, 50)) {
     const instances = figma.currentPage.findAll(
-      n => n.type === 'INSTANCE' && n.mainComponent && n.mainComponent.id === comp.id
+      n => n.type === 'INSTANCE' && (n as InstanceNode).mainComponent?.id === comp.id
     );
     audit.components.push({
       name: comp.name,
@@ -267,7 +300,7 @@ function runAudit(scope) {
 // MESSAGE HANDLERS
 // ============================================
 
-figma.ui.onmessage = async (msg) => {
+figma.ui.onmessage = async (msg: { type: string; payload?: any }) => {
   
   // ---- AUDIT COMMANDS ----
   
@@ -332,7 +365,7 @@ figma.ui.onmessage = async (msg) => {
     const { nodeId, text } = msg.payload;
     const node = figma.getNodeById(nodeId);
     if (node && node.type === 'TEXT') {
-      await figma.loadFontAsync(node.fontName);
+      await figma.loadFontAsync(node.fontName as FontName);
       node.characters = text;
       figma.ui.postMessage({ type: 'text-set', nodeId });
     }
@@ -390,10 +423,8 @@ figma.ui.onmessage = async (msg) => {
 };
 
 // Extract relevant data from a node
-function extractNodeData(node, depth) {
-  if (depth === undefined) depth = 0;
-  
-  const base = {
+function extractNodeData(node: SceneNode, depth: number = 0): any {
+  const base: any = {
     id: node.id,
     name: node.name,
     type: node.type,
