@@ -175,6 +175,21 @@
   </div>
   
   <div class="section">
+    <h3>🧩 Components</h3>
+    <p class="desc">Audit components, instances, and usage</p>
+    <button id="auditComponentsSelection">Audit Selection</button>
+    <button id="auditComponentsPage">Audit Page</button>
+    <button id="auditComponentsAll">Audit All</button>
+  </div>
+  
+  <div class="section">
+    <h3>🔍 Full Audit</h3>
+    <p class="desc">Run all audits at once (colors, text, spacing, components)</p>
+    <button class="primary" id="fullAuditPage">Full Audit (Page)</button>
+    <button class="primary" id="fullAuditAll">Full Audit (All)</button>
+  </div>
+  
+  <div class="section">
     <h3>📋 Existing Styles</h3>
     <button class="secondary" id="viewExisting">View Current Styles</button>
   </div>
@@ -226,6 +241,33 @@
     
     document.getElementById('viewExisting').onclick = () => {
       parent.postMessage({ pluginMessage: { type: 'get-existing-styles' } }, '*');
+    };
+    
+    // Component audit buttons
+    document.getElementById('auditComponentsSelection').onclick = () => {
+      log('Auditing components in selection...');
+      parent.postMessage({ pluginMessage: { type: 'audit-components', scope: 'selection' } }, '*');
+    };
+    
+    document.getElementById('auditComponentsPage').onclick = () => {
+      log('Auditing components on page...');
+      parent.postMessage({ pluginMessage: { type: 'audit-components', scope: 'page' } }, '*');
+    };
+    
+    document.getElementById('auditComponentsAll').onclick = () => {
+      log('Auditing components in document...');
+      parent.postMessage({ pluginMessage: { type: 'audit-components', scope: 'document' } }, '*');
+    };
+    
+    // Full audit buttons
+    document.getElementById('fullAuditPage').onclick = () => {
+      log('Running full audit on page...');
+      parent.postMessage({ pluginMessage: { type: 'complete-audit', scope: 'page' } }, '*');
+    };
+    
+    document.getElementById('fullAuditAll').onclick = () => {
+      log('Running full audit on document...');
+      parent.postMessage({ pluginMessage: { type: 'complete-audit', scope: 'document' } }, '*');
     };
     
     document.getElementById('copyOutput').onclick = () => {

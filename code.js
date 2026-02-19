@@ -679,4 +679,29 @@ figma.ui.onmessage = async (msg) => {
     const result = auditComponents(msg.scope || 'page');
     figma.ui.postMessage({ type: 'component-audit-result', data: result });
   }
+  
+  // Complete audit (everything combined)
+  if (msg.type === 'complete-audit') {
+    const audit = runAudit(msg.scope || 'page');
+    const colorAnalysis = analyzeColors(audit.colors);
+    const spacingAnalysis = analyzeSpacing(audit.spacing);
+    const textAnalysis = analyzeTextStyles(audit.textStyles);
+    const componentAudit = auditComponents(msg.scope || 'page');
+    const existingStyles = getExistingStyles();
+    
+    figma.ui.postMessage({
+      type: 'complete-audit-result',
+      data: {
+        audit: {
+          nodesChecked: audit.nodesChecked,
+          limitReached: audit.limitReached
+        },
+        colors: colorAnalysis,
+        spacing: spacingAnalysis,
+        text: textAnalysis,
+        components: componentAudit,
+        existingStyles: existingStyles
+      }
+    });
+  }
 };
