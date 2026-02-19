@@ -425,7 +425,7 @@ function getExistingStyles() {
     paintStyles: figma.getLocalPaintStyles().map(s => ({
       name: s.name,
       id: s.id,
-      color: s.paints[0]?.type === 'SOLID' ? rgbToHex(s.paints[0].color.r, s.paints[0].color.g, s.paints[0].color.b) : null
+      color: (s.paints[0] && s.paints[0].type === 'SOLID') ? rgbToHex(s.paints[0].color.r, s.paints[0].color.g, s.paints[0].color.b) : null
     })),
     textStyles: figma.getLocalTextStyles().map(s => ({
       name: s.name,
