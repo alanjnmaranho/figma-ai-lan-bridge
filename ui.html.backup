@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Inter, -apple-system, sans-serif;
+      font-size: 12px;
+      padding: 12px;
+      background: #1e1e1e;
+      color: #fff;
+    }
+    h2 { font-size: 14px; margin-bottom: 12px; color: #fff; }
+    h3 { font-size: 12px; margin-bottom: 8px; color: #aaa; font-weight: 500; }
+    .section { margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #333; }
+    .section:last-child { border-bottom: none; }
+    button {
+      background: #0d99ff;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-right: 6px;
+      margin-bottom: 6px;
+      font-size: 11px;
+    }
+    button:hover { background: #0b85e0; }
+    button.secondary {
+      background: #333;
+      border: 1px solid #444;
+    }
+    button.secondary:hover { background: #444; }
+    button.audit {
+      background: #7c3aed;
+    }
+    button.audit:hover { background: #6d28d9; }
+    button.compliance {
+      background: #059669;
+    }
+    button.compliance:hover { background: #047857; }
+    .issue-count { color: #f59e0b; }
+    .ok-count { color: #10b981; }
+    textarea, input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #444;
+      border-radius: 6px;
+      background: #2d2d2d;
+      color: #fff;
+      font-family: monospace;
+      font-size: 11px;
+      margin-bottom: 8px;
+    }
+    textarea { height: 100px; resize: vertical; }
+    #output {
+      background: #2d2d2d;
+      border: 1px solid #444;
+      border-radius: 6px;
+      padding: 8px;
+      height: 200px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 10px;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .label { color: #888; margin-bottom: 4px; display: block; font-size: 10px; }
+    .badge {
+      display: inline-block;
+      background: #333;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      margin-left: 4px;
+    }
+    .stats {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+    .stat {
+      background: #2d2d2d;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+    }
+    .stat-value { font-weight: bold; color: #0d99ff; }
+  </style>
+</head>
+<body>
+  <h2>🤖 AI-Lan Bridge</h2>
+  
+  <div class="section">
+    <h3>✅ Compliance Check</h3>
+    <p style="color: #888; font-size: 10px; margin-bottom: 8px;">Find layers using raw values instead of tokens</p>
+    <button class="compliance" id="complianceSelection">Check Selection</button>
+    <button class="compliance" id="compliancePage">Check Page</button>
+    <button class="compliance" id="complianceDocument">Check All</button>
+    <div style="margin-top: 8px;">
+      <button class="secondary" id="getLocalStyles">View Defined Styles</button>
+    </div>
+    <div id="complianceStats" class="stats" style="margin-top: 8px; display: none;"></div>
+  </div>
+  
+  <div class="section">
+    <h3>🔍 Design System Audit</h3>
+    <button class="audit" id="auditSelection">Audit Selection</button>
+    <button class="audit" id="auditPage">Audit Page</button>
+    <button class="audit" id="auditDocument">Audit All</button>
+    <div style="margin-top: 8px;">
+      <button class="secondary" id="getColors">Colors Only</button>
+      <button class="secondary" id="getTextStyles">Text Styles Only</button>
+      <button class="secondary" id="getSpacing">Spacing Only</button>
+    </div>
+    <div id="stats" class="stats" style="margin-top: 8px; display: none;"></div>
+  </div>
+  
+  <div class="section">
+    <h3>⚡ Quick Actions</h3>
+    <button id="getSelection">Get Selection</button>
+    <button id="getPage">Get Page Structure</button>
+    <button id="exportSelection">Export Selection</button>
+  </div>
+  
+  <div class="section">
+    <h3>🛠️ Run Command</h3>
+    <span class="label">Paste JSON command from AI-Lan</span>
+    <textarea id="command" placeholder='{"type": "rename-node", "payload": {"nodeId": "123:456", "newName": "New Name"}}'></textarea>
+    <button id="runCommand">Run Command</button>
+    <button id="copyOutput" class="secondary">Copy Output</button>
+  </div>
+  
+  <div class="section">
+    <span class="label">Output (copy to AI-Lan)</span>
+    <div id="output">Ready. Use the audit buttons above to analyze your design system.</div>
+  </div>
+
+  <script>
+    const output = document.getElementById('output');
+    const commandInput = document.getElementById('command');
+    const statsDiv = document.getElementById('stats');
+    
+    let lastOutput = 'Ready.';
+    
+    function log(data) {
+      lastOutput = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+      output.textContent = lastOutput;
+    }
+    
+    function showStats(summary) {
+      if (!summary) {
+        statsDiv.style.display = 'none';
+        return;
+      }
+      statsDiv.style.display = 'flex';
+      statsDiv.innerHTML = `
+        <div class="stat">Colors: <span class="stat-value">${summary.totalColors}</span></div>
+        <div class="stat">Text Styles: <span class="stat-value">${summary.totalTextStyles}</span></div>
+        <div class="stat">Spacing: <span class="stat-value">${summary.totalSpacingValues}</span></div>
+        <div class="stat">Effects: <span class="stat-value">${summary.totalEffects}</span></div>
+        <div class="stat">Components: <span class="stat-value">${summary.totalComponents}</span></div>
+      `;
+    }
+    
+    const complianceStatsDiv = document.getElementById('complianceStats');
+    
+    function showComplianceStats(summary) {
+      if (!summary) {
+        complianceStatsDiv.style.display = 'none';
+        return;
+      }
+      complianceStatsDiv.style.display = 'flex';
+      const issueClass = summary.totalIssues > 0 ? 'issue-count' : 'ok-count';
+      complianceStatsDiv.innerHTML = `
+        <div class="stat">Issues: <span class="stat-value ${issueClass}">${summary.totalIssues}</span></div>
+        <div class="stat">Fills: <span class="stat-value">${summary.fillsWithoutStyle}</span></div>
+        <div class="stat">Strokes: <span class="stat-value">${summary.strokesWithoutStyle}</span></div>
+        <div class="stat">Text: <span class="stat-value">${summary.textWithoutStyle}</span></div>
+        <div class="stat">Effects: <span class="stat-value">${summary.effectsWithoutStyle}</span></div>
+      `;
+    }
+    
+    // Compliance buttons
+    document.getElementById('complianceSelection').onclick = () => {
+      log('Checking compliance on selection...');
+      parent.postMessage({ pluginMessage: { type: 'check-compliance-selection' } }, '*');
+    };
+    
+    document.getElementById('compliancePage').onclick = () => {
+      log('Checking compliance on current page...');
+      parent.postMessage({ pluginMessage: { type: 'check-compliance-page' } }, '*');
+    };
+    
+    document.getElementById('complianceDocument').onclick = () => {
+      log('Checking compliance on entire document...');
+      parent.postMessage({ pluginMessage: { type: 'check-compliance-document' } }, '*');
+    };
+    
+    document.getElementById('getLocalStyles').onclick = () => {
+      log('Getting defined local styles...');
+      parent.postMessage({ pluginMessage: { type: 'get-local-styles' } }, '*');
+    };
+    
+    // Audit buttons
+    document.getElementById('auditSelection').onclick = () => {
+      log('Running audit on selection...');
+      parent.postMessage({ pluginMessage: { type: 'audit-selection' } }, '*');
+    };
+    
+    document.getElementById('auditPage').onclick = () => {
+      log('Running audit on current page...');
+      parent.postMessage({ pluginMessage: { type: 'audit-page' } }, '*');
+    };
+    
+    document.getElementById('auditDocument').onclick = () => {
+      log('Running audit on entire document...');
+      parent.postMessage({ pluginMessage: { type: 'audit-document' } }, '*');
+    };
+    
+    document.getElementById('getColors').onclick = () => {
+      parent.postMessage({ pluginMessage: { type: 'get-colors', payload: { scope: 'page' } } }, '*');
+    };
+    
+    document.getElementById('getTextStyles').onclick = () => {
+      parent.postMessage({ pluginMessage: { type: 'get-text-styles', payload: { scope: 'page' } } }, '*');
+    };
+    
+    document.getElementById('getSpacing').onclick = () => {
+      parent.postMessage({ pluginMessage: { type: 'get-spacing', payload: { scope: 'page' } } }, '*');
+    };
+    
+    // Quick action buttons
+    document.getElementById('getSelection').onclick = () => {
+      parent.postMessage({ pluginMessage: { type: 'get-selection' } }, '*');
+    };
+    
+    document.getElementById('getPage').onclick = () => {
+      parent.postMessage({ pluginMessage: { type: 'get-page' } }, '*');
+    };
+    
+    document.getElementById('exportSelection').onclick = () => {
+      parent.postMessage({ pluginMessage: { type: 'get-selection' } }, '*');
+    };
+    
+    document.getElementById('runCommand').onclick = () => {
+      try {
+        const cmd = JSON.parse(commandInput.value);
+        parent.postMessage({ pluginMessage: cmd }, '*');
+        log('Command sent: ' + cmd.type);
+      } catch (e) {
+        log('Error: Invalid JSON - ' + e.message);
+      }
+    };
+    
+    document.getElementById('copyOutput').onclick = () => {
+      navigator.clipboard.writeText(output.textContent);
+      const prev = output.textContent;
+      output.textContent = '✓ Copied to clipboard!';
+      setTimeout(() => { output.textContent = prev; }, 1000);
+    };
+    
+    // Handle messages from plugin
+    window.onmessage = (event) => {
+      const msg = event.data.pluginMessage;
+      if (!msg) return;
+      
+      if (msg.type === 'compliance-result') {
+        showComplianceStats(msg.data.summary);
+        showStats(null);
+        log(msg.data);
+      } else if (msg.type === 'local-styles-result') {
+        showComplianceStats(null);
+        showStats(null);
+        log(msg.data);
+      } else if (msg.type === 'audit-result') {
+        showComplianceStats(null);
+        showStats(msg.data.summary);
+        log(msg.data);
+      } else if (msg.type === 'colors-result' || msg.type === 'text-styles-result' || msg.type === 'spacing-result') {
+        showComplianceStats(null);
+        showStats(null);
+        log(msg.data);
+      } else {
+        showComplianceStats(null);
+        showStats(null);
+        log(msg);
+      }
+    };
+  </script>
+</body>
+</html>
