@@ -477,6 +477,136 @@ function getExistingStyles() {
 }
 
 // ============================================
+// COMPONENT AUDIT FUNCTIONS
+// ============================================
+
+function auditComponents(scope) {
+  var components = [];
+  var componentSets = [];
+  var instances = [];
+  var detachedInstances = [];
+  
+  function crawlForComponents(node, depth) {
+    if (depth > 50) return;
+    
+    if (node.type === 'COMPONENT') {
+      components.push({
+        name: node.name,
+        id: node.id,
+        parent: node.parent ? node.parent.name : null,
+        width: Math.round(node.width),
+        height: Math.round(node.height)
+      });
+    }
+    
+    if (node.type === 'COMPONENT_SET') {
+      var variants = [];
+      if (node.children) {
+        for (var i = 0; i < node.children.length; i++) {
+          var child = node.children[i];
+          if (child.type === 'COMPONENT') {
+            variants.push({
+              name: child.name,
+              id: child.id
+            });
+          }
+        }
+      }
+      componentSets.push({
+        name: node.name,
+        id: node.id,
+        variantCount: variants.length,
+        variants: variants.slice(0, 10) // limit to first 10
+      });
+    }
+    
+    if (node.type === 'INSTANCE') {
+      var mainComponent = node.mainComponent;
+      var isDetached = !mainComponent;
+      
+      var instanceInfo = {
+        name: node.name,
+        id: node.id,
+        mainComponentId: mainComponent ? mainComponent.id : null,
+        mainComponentName: mainComponent ? mainComponent.name : 'DETACHED',
+        hasOverrides: false
+      };
+      
+      // Check for overrides (simplified check)
+      if (mainComponent && node.overrides && node.overrides.length > 0) {
+        instanceInfo.hasOverrides = true;
+        instanceInfo.overrideCount = node.overrides.length;
+      }
+      
+      if (isDetached) {
+        detachedInstances.push(instanceInfo);
+      } else {
+        instances.push(instanceInfo);
+      }
+    }
+    
+    if ('children' in node) {
+      for (var j = 0; j < node.children.length; j++) {
+        crawlForComponents(node.children[j], depth + 1);
+      }
+    }
+  }
+  
+  // Get nodes to audit based on scope
+  var nodesToAudit = [];
+  if (scope === 'selection') {
+    nodesToAudit = figma.currentPage.selection;
+  } else if (scope === 'page') {
+    nodesToAudit = figma.currentPage.children;
+  } else {
+    // document scope
+    for (var p = 0; p < figma.root.children.length; p++) {
+      var page = figma.root.children[p];
+      for (var c = 0; c < page.children.length; c++) {
+        crawlForComponents(page.children[c], 0);
+      }
+    }
+  }
+  
+  if (scope !== 'document') {
+    for (var n = 0; n < nodesToAudit.length; n++) {
+      crawlForComponents(nodesToAudit[n], 0);
+    }
+  }
+  
+  // Count instance usage per component
+  var componentUsage = {};
+  for (var k = 0; k < instances.length; k++) {
+    var inst = instances[k];
+    var compId = inst.mainComponentId;
+    if (compId) {
+      componentUsage[compId] = (componentUsage[compId] || 0) + 1;
+    }
+  }
+  
+  // Add usage count to components
+  for (var m = 0; m < components.length; m++) {
+    components[m].instanceCount = componentUsage[components[m].id] || 0;
+  }
+  
+  // Sort by usage
+  components.sort(function(a, b) { return b.instanceCount - a.instanceCount; });
+  
+  return {
+    summary: {
+      totalComponents: components.length,
+      totalComponentSets: componentSets.length,
+      totalInstances: instances.length,
+      detachedInstances: detachedInstances.length
+    },
+    components: components.slice(0, 50), // top 50
+    componentSets: componentSets,
+    detachedInstances: detachedInstances,
+    unusedComponents: components.filter(function(c) { return c.instanceCount === 0; })
+  };
+}
+
+// ============================================
 // MESSAGE HANDLERS
 // ============================================
 
@@ -542,5 +672,11 @@ figma.ui.onmessage = async (msg) => {
   if (msg.type === 'get-existing-styles') {
     const styles = getExistingStyles();
     figma.ui.postMessage({ type: 'existing-styles', data: styles });
+  }
+  
+  // Component audit
+  if (msg.type === 'audit-components') {
+    const result = auditComponents(msg.scope || 'page');
+    figma.ui.postMessage({ type: 'component-audit-result', data: result });
   }
 };
