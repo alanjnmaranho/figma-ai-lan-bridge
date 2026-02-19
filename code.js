@@ -421,22 +421,58 @@ async function createTextStyles(typeScale) {
 }
 
 function getExistingStyles() {
+  // Get color variables
+  var colorVariables = [];
+  try {
+    var allVars = figma.variables.getLocalVariables('COLOR');
+    var collections = figma.variables.getLocalVariableCollections();
+    var collectionMap = {};
+    for (var i = 0; i < collections.length; i++) {
+      collectionMap[collections[i].id] = collections[i].name;
+    }
+    
+    for (var j = 0; j < allVars.length; j++) {
+      var v = allVars[j];
+      var modeId = Object.keys(v.valuesByMode)[0];
+      var value = v.valuesByMode[modeId];
+      var hex = null;
+      if (value && typeof value === 'object' && 'r' in value) {
+        hex = rgbToHex(value.r, value.g, value.b);
+      }
+      colorVariables.push({
+        name: v.name,
+        id: v.id,
+        collection: collectionMap[v.variableCollectionId] || 'Unknown',
+        hex: hex
+      });
+    }
+  } catch (e) {
+    console.log('Error getting variables:', e);
+  }
+  
   return {
-    paintStyles: figma.getLocalPaintStyles().map(s => ({
-      name: s.name,
-      id: s.id,
-      color: (s.paints[0] && s.paints[0].type === 'SOLID') ? rgbToHex(s.paints[0].color.r, s.paints[0].color.g, s.paints[0].color.b) : null
-    })),
-    textStyles: figma.getLocalTextStyles().map(s => ({
-      name: s.name,
-      id: s.id,
-      fontSize: s.fontSize,
-      fontFamily: s.fontName.family
-    })),
-    effectStyles: figma.getLocalEffectStyles().map(s => ({
-      name: s.name,
-      id: s.id
-    }))
+    paintStyles: figma.getLocalPaintStyles().map(function(s) {
+      return {
+        name: s.name,
+        id: s.id,
+        color: (s.paints[0] && s.paints[0].type === 'SOLID') ? rgbToHex(s.paints[0].color.r, s.paints[0].color.g, s.paints[0].color.b) : null
+      };
+    }),
+    colorVariables: colorVariables,
+    textStyles: figma.getLocalTextStyles().map(function(s) {
+      return {
+        name: s.name,
+        id: s.id,
+        fontSize: s.fontSize,
+        fontFamily: s.fontName.family
+      };
+    }),
+    effectStyles: figma.getLocalEffectStyles().map(function(s) {
+      return {
+        name: s.name,
+        id: s.id
+      };
+    })
   };
 }
 
