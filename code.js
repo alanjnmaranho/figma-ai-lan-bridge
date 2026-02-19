@@ -307,7 +307,7 @@ function analyzeSpacing(spacing) {
           nearest = sv;
         }
       }
-      offScale.push({ ...sp, suggestedValue: nearest });
+      offScale.push(Object.assign({}, sp, { suggestedValue: nearest }));
     }
   }
   
