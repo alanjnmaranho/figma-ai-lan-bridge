@@ -485,9 +485,11 @@ function auditComponents(scope) {
   var componentSets = [];
   var instances = [];
   var detachedInstances = [];
+  var counter = { checked: 0, limit: 5000 };
   
   function crawlForComponents(node, depth) {
-    if (depth > 50) return;
+    if (depth > 50 || counter.checked > counter.limit) return;
+    counter.checked++;
     
     if (node.type === 'COMPONENT') {
       components.push({
@@ -597,7 +599,9 @@ function auditComponents(scope) {
       totalComponents: components.length,
       totalComponentSets: componentSets.length,
       totalInstances: instances.length,
-      detachedInstances: detachedInstances.length
+      detachedInstances: detachedInstances.length,
+      nodesChecked: counter.checked,
+      limitReached: counter.checked >= counter.limit
     },
     components: components.slice(0, 50), // top 50
     componentSets: componentSets,
